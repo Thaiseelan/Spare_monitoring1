@@ -547,6 +547,138 @@ router.get("/data", async (req, res) => {
   }
 })
 
+// GET /api/sensors/data/time-based - New endpoint for time-based data
+router.get("/data/time-based", async (req, res) => {
+  try {
+    const { component_id, period } = req.query
+    
+    if (!period || !['daily', 'weekly', 'monthly'].includes(period)) {
+      return res.status(400).json({ error: "Period must be 'daily', 'weekly', or 'monthly'" })
+    }
+
+    let query = "SELECT * FROM sensor_data"
+    const params = []
+    let whereClause = ""
+
+    if (component_id) {
+      whereClause += " WHERE component_id = ?"
+      params.push(component_id)
+    }
+
+    // Add time-based filtering
+    const now = new Date()
+    let startDate = new Date()
+    
+    switch (period) {
+      case 'daily':
+        startDate.setDate(now.getDate() - 1)
+        break
+      case 'weekly':
+        startDate.setDate(now.getDate() - 7)
+        break
+      case 'monthly':
+        startDate.setMonth(now.getMonth() - 1)
+        break
+    }
+
+    if (whereClause) {
+      whereClause += " AND timestamp >= ?"
+    } else {
+      whereClause = " WHERE timestamp >= ?"
+    }
+    params.push(startDate.toISOString())
+
+    query += whereClause + " ORDER BY timestamp DESC"
+
+    const rowsResult = await db.execute(query, params)
+    const rows = Array.isArray(rowsResult[0]) ? rowsResult[0] : rowsResult;
+    
+    res.json({
+      period,
+      startDate: startDate.toISOString(),
+      endDate: now.toISOString(),
+      data: rows,
+      count: rows.length
+    })
+  } catch (error) {
+    console.error("Time-based sensor data fetch error:", error)
+    res.status(500).json({ error: "Failed to fetch time-based sensor data" })
+  }
+})
+
+// GET /api/sensors/data/aggregated - New endpoint for aggregated time-based data
+router.get("/data/aggregated", async (req, res) => {
+  try {
+    const { component_id, period } = req.query
+    
+    if (!period || !['daily', 'weekly', 'monthly'].includes(period)) {
+      return res.status(400).json({ error: "Period must be 'daily', 'weekly', or 'monthly'" })
+    }
+
+    let query = `
+      SELECT 
+        DATE(timestamp) as date,
+        AVG(temperature) as avg_temperature,
+        AVG(vibration) as avg_vibration,
+        AVG(noise) as avg_noise,
+        MAX(temperature) as max_temperature,
+        MAX(vibration) as max_vibration,
+        MAX(noise) as max_noise,
+        MIN(temperature) as min_temperature,
+        MIN(vibration) as min_vibration,
+        MIN(noise) as min_noise,
+        COUNT(*) as readings_count
+      FROM sensor_data
+    `
+    const params = []
+    let whereClause = ""
+
+    if (component_id) {
+      whereClause += " WHERE component_id = ?"
+      params.push(component_id)
+    }
+
+    // Add time-based filtering
+    const now = new Date()
+    let startDate = new Date()
+    
+    switch (period) {
+      case 'daily':
+        startDate.setDate(now.getDate() - 1)
+        break
+      case 'weekly':
+        startDate.setDate(now.getDate() - 7)
+        break
+      case 'monthly':
+        startDate.setMonth(now.getMonth() - 1)
+        break
+    }
+
+    if (whereClause) {
+      whereClause += " AND timestamp >= ?"
+    } else {
+      whereClause = " WHERE timestamp >= ?"
+    }
+    params.push(startDate.toISOString())
+
+    query += whereClause + " GROUP BY DATE(timestamp) ORDER BY date DESC"
+
+    const rowsResult = await db.execute(query, params)
+    const rows = Array.isArray(rowsResult[0]) ? rowsResult[0] : rowsResult;
+    
+    res.json({
+      period,
+      startDate: startDate.toISOString(),
+      endDate: now.toISOString(),
+      aggregatedData: rows,
+      count: rows.length
+    })
+  } catch (error) {
+    console.error("Aggregated sensor data fetch error:", error)
+    res.status(500).json({ error: "Failed to fetch aggregated sensor data" })
+  }
+})
+
 // GET /api/sensors/alerts (existing endpoint)
 router.get("/alerts", async (req, res) => {
   try {

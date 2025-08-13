@@ -132,6 +132,34 @@ const apiService = {
       return [];
     }
     return await res.json();
+  },
+
+  // Get time-based sensor data
+  async getTimeBasedSensorData(componentId: number, period: 'daily' | 'weekly' | 'monthly'): Promise<any> {
+    const res = await fetch(`${API_BASE}/sensors/data/time-based?component_id=${componentId}&period=${period}`);
+    if (!res.ok) throw new Error(`Time-based sensor data fetch failed: ${res.status}`);
+    return await res.json();
+  },
+
+  // Get aggregated time-based sensor data
+  async getAggregatedSensorData(componentId: number, period: 'daily' | 'weekly' | 'monthly'): Promise<any> {
+    const res = await fetch(`${API_BASE}/sensors/data/aggregated?component_id=${componentId}&period=${period}`);
+    if (!res.ok) throw new Error(`Aggregated sensor data fetch failed: ${res.status}`);
+    return await res.json();
+  },
+
+  // Get time-based maintenance data
+  async getTimeBasedMaintenanceData(componentId: number, period: 'daily' | 'weekly' | 'monthly'): Promise<any> {
+    const res = await fetch(`${API_BASE}/maintenance/time-based?component_id=${componentId}&period=${period}`);
+    if (!res.ok) throw new Error(`Time-based maintenance data fetch failed: ${res.status}`);
+    return await res.json();
+  },
+
+  // Get maintenance summary by time period
+  async getMaintenanceSummary(period: 'daily' | 'weekly' | 'monthly'): Promise<any> {
+    const res = await fetch(`${API_BASE}/maintenance/summary?period=${period}`);
+    if (!res.ok) throw new Error(`Maintenance summary fetch failed: ${res.status}`);
+    return await res.json();
   }
 };
 

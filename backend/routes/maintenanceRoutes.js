@@ -82,4 +82,125 @@ router.get("/", async (req, res) => {
   }
 })
 
+// GET /api/maintenance/time-based - New endpoint for time-based maintenance data
+router.get("/time-based", async (req, res) => {
+  try {
+    const { component_id, period } = req.query
+    
+    if (!period || !['daily', 'weekly', 'monthly'].includes(period)) {
+      return res.status(400).json({ error: "Period must be 'daily', 'weekly', or 'monthly'" })
+    }
+
+    let query = `
+      SELECT 
+        sl.id, 
+        sl.component_id, 
+        c.name as component_name,
+        sl.service_type as description, 
+        'System' as performed_by, 
+        sl.serviced_at as performed_at,
+        DATE_ADD(sl.serviced_at, INTERVAL 30 DAY) as next_maintenance,
+        sl.notes
+      FROM service_logs sl
+      JOIN components c ON sl.component_id = c.id
+    `
+    const params = []
+    let whereClause = ""
+
+    if (component_id) {
+      whereClause += " WHERE sl.component_id = ?"
+      params.push(component_id)
+    }
+
+    // Add time-based filtering
+    const now = new Date()
+    let startDate = new Date()
+    
+    switch (period) {
+      case 'daily':
+        startDate.setDate(now.getDate() - 1)
+        break
+      case 'weekly':
+        startDate.setDate(now.getDate() - 7)
+        break
+      case 'monthly':
+        startDate.setMonth(now.getMonth() - 1)
+        break
+    }
+
+    if (whereClause) {
+      whereClause += " AND sl.serviced_at >= ?"
+    } else {
+      whereClause = " WHERE sl.serviced_at >= ?"
+    }
+    params.push(startDate.toISOString())
+
+    query += whereClause + " ORDER BY sl.serviced_at DESC"
+
+    const [rows] = await db.execute(query, params)
+    
+    res.json({
+      period,
+      startDate: startDate.toISOString(),
+      endDate: now.toISOString(),
+      maintenanceRecords: rows,
+      count: rows.length
+    })
+  } catch (error) {
+    console.error("Time-based maintenance data fetch error:", error)
+    res.status(500).json({ error: "Failed to fetch time-based maintenance data" })
+  }
+})
+
+// GET /api/maintenance/summary - New endpoint for maintenance summary by time period
+router.get("/summary", async (req, res) => {
+  try {
+    const { period } = req.query
+    
+    if (!period || !['daily', 'weekly', 'monthly'].includes(period)) {
+      return res.status(400).json({ error: "Period must be 'daily', 'weekly', or 'monthly'" })
+    }
+
+    // Add time-based filtering
+    const now = new Date()
+    let startDate = new Date()
+    
+    switch (period) {
+      case 'daily':
+        startDate.setDate(now.getDate() - 1)
+        break
+      case 'weekly':
+        startDate.setDate(now.getDate() - 7)
+        break
+      case 'monthly':
+        startDate.setMonth(now.getMonth() - 1)
+        break
+    }
+
+    const query = `
+      SELECT 
+        COUNT(*) as total_maintenance,
+        COUNT(DISTINCT component_id) as components_serviced,
+        DATE(serviced_at) as service_date
+      FROM service_logs 
+      WHERE serviced_at >= ?
+      GROUP BY DATE(serviced_at)
+      ORDER BY service_date DESC
+    `
+
+    const [rows] = await db.execute(query, [startDate.toISOString()])
+    
+    res.json({
+      period,
+      startDate: startDate.toISOString(),
+      endDate: now.toISOString(),
+      summary: rows,
+      totalRecords: rows.length
+    })
+  } catch (error) {
+    console.error("Maintenance summary fetch error:", error)
+    res.status(500).json({ error: "Failed to fetch maintenance summary" })
+  }
+})
+
 module.exports = router

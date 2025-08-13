@@ -167,6 +167,10 @@ app.use('/api/components', componentRoutes);
 const sensorRoutes = require('./routes/sensorRoutes');
 app.use('/api/sensors', sensorRoutes);
 
+// ✅ Maintenance routes
+const maintenanceRoutes = require('./routes/maintenanceRoutes');
+app.use('/api/maintenance', maintenanceRoutes);
+
 // Fallback route
 app.use((req, res) => {
   res.status(404).json({ error: 'Endpoint not found' });
